@@ -2,3 +2,5 @@
 使用 [Elton Chen-Yu Ho](https://github.com/ChenYuHo) / [handwriting.js](https://github.com/ChenYuHo/handwriting.js) 為核心，給自己撰寫的測試50音單字程式
 
 Gimini vide coding 99%
+
+Preview:[Here](https://engine-sp.github.io/Gojuon/typejapan.htm)
