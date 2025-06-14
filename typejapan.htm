@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>50音書寫練習</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7fafc; /* Tailwind gray-50 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        canvas {
+            border: 2px solid #cbd5e0; /* Tailwind gray-300 */
+            background-color: #ffffff;
+            touch-action: none; /* 防止在觸控裝置上繪圖時滾動 */
+            border-radius: 0.5rem; /* rounded-lg */
+        }
+        /* 選中按鈕的樣式 */
+        .prediction-button.selected {
+            background-color: #6366f1; /* Indigo-500 */
+            color: white;
+            border-color: #4f46e5; /* Indigo-600 */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-100 to-purple-100">
+    <div id="app-container" class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-4xl mx-auto flex flex-col items-center space-y-6">
+        <h1 class="text-4xl font-bold text-gray-800 mb-4">50音書寫練習</h1>
+
+        <!-- 遊戲主畫面 -->
+        <div id="quiz-container" class="w-full flex flex-col md:flex-row space-y-6 md:space-y-0 md:space-x-6 items-center">
+            <!-- 出題區 -->
+            <div class="w-full md:w-1/2 bg-blue-50 p-6 rounded-lg shadow-inner flex flex-col items-center justify-center min-h-[250px]">
+                <h2 class="text-2xl font-semibold text-blue-800 mb-4">出題區</h2>
+                <div id="question-display" class="text-8xl font-black text-blue-600 mb-4 p-4 bg-blue-100 rounded-lg min-w-[150px] text-center shadow-md">
+                    <!-- 問題會顯示在這裡 -->
+                </div>
+                <p id="question-type-display" class="text-lg text-blue-700 font-medium mt-2">
+                    <!-- 問題類型 (平假名/片假名) 會顯示在這裡 -->
+                </p>
+                <div class="text-xl font-medium text-gray-700 mt-4">
+                    分數: <span id="score-display" class="text-green-600 font-bold">0</span> / 題目: <span id="question-count-display" class="text-purple-600 font-bold">0/10</span>
+                </div>
+            </div>
+
+            <!-- 做題區 -->
+            <div class="w-full md:w-1/2 bg-purple-50 p-6 rounded-lg shadow-inner flex flex-col items-center justify-center min-h-[250px]">
+                <h2 class="text-2xl font-semibold text-purple-800 mb-4">做題區</h2>
+                <p class="text-gray-600 text-sm mb-2 text-center">
+                    請在下方方格內書寫。<br>系統會嘗試辨識，請從結果中選擇對應假名。
+                    <br>平假名對應片假名，片假名對應平假名。
+                </p>
+                <canvas id="drawing-canvas" width="250" height="250" class="w-full max-w-xs sm:max-w-sm md:max-w-md h-auto mb-4"></canvas>
+                <button id="clear-canvas-btn" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300 transition duration-300 ease-in-out mb-4 shadow">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-1" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 011-1h4a1 1 0 110 2H8a1 1 0 01-1-1z" clip-rule="evenodd" />
+                    </svg>
+                    清除畫布
+                </button>
+
+                <!-- 辨識結果按鈕容器 -->
+                <div id="prediction-buttons-container" class="flex flex-wrap justify-center gap-2 mb-4 w-full max-w-sm">
+                    <!-- 辨識結果按鈕會顯示在這裡 -->
+                </div>
+
+                <button id="submit-btn" class="bg-green-500 text-white px-8 py-3 rounded-lg text-xl font-bold hover:bg-green-600 transition duration-300 ease-in-out shadow-lg opacity-50 cursor-not-allowed" disabled>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 inline-block mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                    送出答案
+                </button>
+                <div id="feedback-area" class="mt-4 w-full text-center">
+                    <p id="selected-answer-preview" class="text-xl text-gray-700 mt-2">
+                        <!-- 您選擇的答案預覽會顯示在這裡 -->
+                    </p>
+                    <p id="feedback-display" class="text-2xl font-bold mt-2">
+                        <!-- 答案判定結果會顯示在這裡 -->
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 結算畫面 -->
+        <div id="result-screen" class="hidden w-full bg-yellow-50 p-8 rounded-lg shadow-lg flex flex-col items-center text-center mt-8">
+            <h2 class="text-3xl font-bold text-yellow-800 mb-4">練習結束！</h2>
+            <p class="text-2xl text-gray-700 mb-6">您的最終分數是: <span id="final-score-display" class="text-red-600 font-black text-4xl"></span> 分</p>
+            <button id="play-again-btn" class="bg-blue-500 text-white px-8 py-4 rounded-lg text-2xl font-bold hover:bg-blue-600 transition duration-300 ease-in-out shadow-xl">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 inline-block mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004 12m7-7h5m2 2v5m-6 6h-4.582m14.356-2H20a8.001 8.001 0 01-15.356 2L4 16m2-2h-5" />
+                </svg>
+                再玩一次
+            </button>
+        </div>
+    </div>
+
+    <!-- 引入 handwriting.js 函式庫 - 移到這裡確保在主腳本前載入 -->
+    <script src="handwriting.canvas.js"></script>
+
+    <script>
+        // 假名對照表 (平假名 <-> 片假名)
+        const kanaMap = {
+            'あ': 'ア', 'い': 'イ', 'う': 'ウ', 'え': 'エ', 'お': 'オ',
+            'か': 'カ', 'き': 'キ', 'く': 'ク', 'け': 'ケ', 'こ': 'コ',
+            'さ': 'サ', 'し': 'シ', 'す': 'ス', 'せ': 'セ', 'そ': 'ソ',
+            'た': 'タ', 'ち': 'チ', 'つ': 'ツ', 'て': 'テ', 'と': 'ト',
+            'な': 'ナ', 'に': 'ニ', 'ぬ': 'ヌ', 'ね': 'ネ', 'の': 'ノ',
+            'は': 'ハ', 'ひ': 'ヒ', 'ふ': 'フ', 'へ': 'ヘ', 'ほ': 'ホ',
+            'ま': 'マ', 'み': 'ミ', 'む': 'ム', 'め': 'メ', 'も': 'モ',
+            'や': 'ヤ', 'ゆ': 'ユ', 'よ': 'ヨ',
+            'ら': 'ラ', 'り': 'リ', 'る': 'ル', 'れ': 'レ', 'ろ': 'ロ',
+            'わ': 'ワ', 'を': 'ヲ', 'ん': 'ン',
+            // 濁音、半濁音、拗音等通常在基礎學習後
+            'が': 'ガ', 'ぎ': 'ギ', 'ぐ': 'グ', 'げ': 'ゲ', 'ご': 'ゴ',
+            'ざ': 'ザ', 'じ': 'ジ', 'ず': 'ズ', 'ぜ': 'ゼ', 'ぞ': 'ゾ',
+            'だ': 'ダ', 'ぢ': 'ヂ', 'づ': 'ヅ', 'で': 'デ', 'ど': 'ド',
+            'ば': 'バ', 'び': 'ビ', 'ぶ': 'ブ', 'べ': 'ベ', 'ぼ': 'ボ',
+            'ぱ': 'パ', 'ぴ': 'ピ', 'ぷ': 'プ', 'ぺ': 'ペ', 'ぽ': 'ポ',
+            'きゃ': 'キャ', 'きゅ': 'キュ', 'きょ': 'キョ',
+            'しゃ': 'シャ', 'しゅ': 'シュ', 'しょ': 'ショ',
+            'ちゃ': 'チャ', 'ちゅ': 'チュ', 'ちょ': 'チョ',
+            'にゃ': 'ニャ', 'にゅ': 'ニュ', 'にょ': 'ニョ',
+            'ひゃ': 'ヒャ', 'ひゅ': 'ヒュ', 'ひょ': 'ヒョ',
+            'みゃ': 'ミャ', 'みゅ': 'ミュ', 'みょ': 'ミョ',
+            'りゃ': 'リャ', 'りゅ': 'リュ', 'りょ': 'リョ',
+            'ぎゃ': 'ギャ', 'ぎゅ': 'ギュ', 'ぎょ': 'ギョ',
+            'じゃ': 'ジャ', 'じゅ': 'ジュ', 'じょ': 'ジョ',
+            'びゃ': 'ビャ', 'びゅ': 'ビュ', 'びょ': 'ビョ',
+            'ぴゃ': 'ピャ', 'ぴゅ': 'ピュ', 'ぴょ': 'ピョ',
+            // 小寫假名
+            'ぁ': 'ァ', 'ぃ': 'ィ', 'ぅ': 'ゥ', 'ぇ': 'ェ', 'ぉ': 'ォ',
+            'っ': 'ッ', 'ゃ': 'ャ', 'ゅ': 'ュ', 'ょ': 'ョ'
+        };
+
+        // 將對照表反轉，方便查找 (片假名 <-> 平假名)
+        const reverseKanaMap = Object.fromEntries(
+            Object.entries(kanaMap).map(([key, value]) => [value, key])
+        );
+
+        // 取得所有平假名和片假名作為問題來源
+        const allHiragana = Object.keys(kanaMap);
+        const allKatakana = Object.values(kanaMap);
+
+        // 遊戲狀態變數
+        let score = 0;
+        let questionCount = 0;
+        const maxQuestions = 10;
+        let currentQuestionChar = ''; // 當前出題的字元
+        let currentCorrectAnswer = ''; // 當前問題的正確答案
+        let currentSelectedAnswer = ''; // 用來儲存使用者從辨識結果中選擇的答案
+        let recognitionTimeout = null; // 用來儲存辨識延遲的計時器
+
+        // 繪圖筆畫資料
+        let strokes = []; // 用於儲存整個繪圖的筆畫，每個筆畫是一個點的陣列
+        let currentStroke = []; // 用於儲存當前正在繪製的筆畫中的點
+
+        // 取得 DOM 元素
+        const quizContainer = document.getElementById('quiz-container');
+        const questionDisplay = document.getElementById('question-display');
+        const questionTypeDisplay = document.getElementById('question-type-display');
+        const scoreDisplay = document.getElementById('score-display');
+        const questionCountDisplay = document.getElementById('question-count-display');
+        const drawingCanvas = document.getElementById('drawing-canvas');
+        const ctx = drawingCanvas.getContext('2d');
+        const clearCanvasBtn = document.getElementById('clear-canvas-btn');
+        const predictionButtonsContainer = document.getElementById('prediction-buttons-container'); // 新增的辨識結果按鈕容器
+        const submitBtn = document.getElementById('submit-btn');
+        const feedbackDisplay = document.getElementById('feedback-display');
+        const selectedAnswerPreview = document.getElementById('selected-answer-preview'); // 更新為顯示選擇的答案預覽
+        const resultScreen = document.getElementById('result-screen');
+        const finalScoreDisplay = document.getElementById('final-score-display');
+        const playAgainBtn = document.getElementById('play-again-btn');
+
+        // 繪圖變數
+        let isDrawing = false;
+        let lastX = 0;
+        let lastY = 0;
+
+        /**
+         * 初始化畫布設定
+         */
+        function setupCanvas() {
+            ctx.lineWidth = 5;
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = '#000'; // 黑色筆跡
+            clearCanvas(); // 清空畫布
+        }
+
+        /**
+         * 清除畫布內容、辨識結果和回饋
+         */
+        function clearCanvas() {
+            ctx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+            strokes = []; // 清空筆畫資料
+            currentStroke = []; // 清空當前筆畫
+            predictionButtonsContainer.innerHTML = ''; // 清除辨識結果按鈕
+            selectedAnswerPreview.textContent = ''; // 清除選擇答案預覽
+            feedbackDisplay.textContent = ''; // 清除回饋
+            currentSelectedAnswer = ''; // 重置選擇的答案
+            submitBtn.disabled = true; // 禁用送出按鈕
+            submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            clearTimeout(recognitionTimeout); // 清除任何待處理的辨識計時器
+        }
+
+        /**
+         * 繪圖功能：處理滑鼠/觸控板移動
+         * @param {MouseEvent|TouchEvent} e - 事件物件
+         */
+        function draw(e) {
+            if (!isDrawing) return;
+
+            // 取得當前滑鼠/觸控位置
+            let clientX, clientY;
+            if (e.touches) { // 觸控事件
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else { // 滑鼠事件
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+
+            // 根據畫布大小和位置調整座標
+            const rect = drawingCanvas.getBoundingClientRect();
+            const scaleX = drawingCanvas.width / rect.width;
+            const scaleY = drawingCanvas.height / rect.height;
+            const currentX = (clientX - rect.left) * scaleX;
+            const currentY = (clientY - rect.top) * scaleY;
+
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(currentX, currentY);
+            ctx.stroke();
+            [lastX, lastY] = [currentX, currentY];
+
+            currentStroke.push([currentX, currentY]); // 儲存當前筆畫的點
+        }
+
+        // 綁定繪圖事件監聽器
+        drawingCanvas.addEventListener('mousedown', (e) => {
+            isDrawing = true;
+            currentStroke = []; // 開始新筆畫
+            const rect = drawingCanvas.getBoundingClientRect();
+            const scaleX = drawingCanvas.width / rect.width;
+            const scaleY = drawingCanvas.height / rect.height;
+            lastX = (e.clientX - rect.left) * scaleX;
+            lastY = (e.clientY - rect.top) * scaleY;
+            currentStroke.push([lastX, lastY]); // 儲存第一個點
+            clearTimeout(recognitionTimeout); // 新的繪圖開始，清除之前的辨識計時器
+        });
+        drawingCanvas.addEventListener('mousemove', draw);
+        drawingCanvas.addEventListener('mouseup', () => {
+            if (isDrawing) {
+                isDrawing = false;
+                strokes.push(currentStroke); // 完成一個筆畫，加入筆畫列表
+                // 設定延遲辨識，讓使用者有時間完成多筆畫
+                recognitionTimeout = setTimeout(recognizeHandwriting, 1000);
+            }
+        });
+        drawingCanvas.addEventListener('mouseout', () => {
+            if (isDrawing) {
+                isDrawing = false;
+                strokes.push(currentStroke); // 完成一個筆畫，加入筆畫列表
+                // 設定延遲辨識，讓使用者有時間完成多筆畫
+                recognitionTimeout = setTimeout(recognizeHandwriting, 1000);
+            }
+        });
+
+        // 綁定觸控事件監聽器 (用於移動裝置)
+        drawingCanvas.addEventListener('touchstart', (e) => {
+            e.preventDefault(); // 防止滾動頁面
+            isDrawing = true;
+            currentStroke = []; // 開始新筆畫
+            const rect = drawingCanvas.getBoundingClientRect();
+            const scaleX = drawingCanvas.width / rect.width;
+            const scaleY = drawingCanvas.height / rect.height;
+            lastX = (e.touches[0].clientX - rect.left) * scaleX;
+            lastY = (e.touches[0].clientY - rect.top) * scaleY;
+            currentStroke.push([lastX, lastY]); // 儲存第一個點
+            clearTimeout(recognitionTimeout); // 新的繪圖開始，清除之前的辨識計時器
+        });
+        drawingCanvas.addEventListener('touchmove', (e) => {
+            e.preventDefault(); // 防止滾動頁面
+            draw(e);
+        });
+        drawingCanvas.addEventListener('touchend', () => {
+            if (isDrawing) {
+                isDrawing = false;
+                strokes.push(currentStroke); // 完成一個筆畫，加入筆畫列表
+                // 設定延遲辨識，讓使用者有時間完成多筆畫
+                recognitionTimeout = setTimeout(recognizeHandwriting, 1000);
+            }
+        });
+
+        clearCanvasBtn.addEventListener('click', clearCanvas);
+
+        /**
+         * 將內部儲存的筆畫資料格式轉換為 handwriting.js 函式庫所需的 trace 格式
+         * @param {Array<Array<Array<number>>>} strokesData - 原始筆畫資料 [[ [x,y], [x,y] ], ...]
+         * @returns {Array<Array<Array<number>>>} trace 格式資料 [[[x,x,x], [y,y,y]], ...]
+         */
+        function convertStrokesToTrace(strokesData) {
+            const trace = [];
+            strokesData.forEach(stroke => {
+                const xCoords = [];
+                const yCoords = [];
+                stroke.forEach(point => {
+                    xCoords.push(point[0]); // x-coordinate
+                    yCoords.push(point[1]); // y-coordinate
+                });
+                trace.push([xCoords, yCoords]);
+            });
+            return trace;
+        }
+
+        /**
+         * 使用 handwriting.js 辨識手寫筆畫
+         */
+        function recognizeHandwriting() {
+            if (strokes.length === 0) {
+                predictionButtonsContainer.innerHTML = '';
+                return;
+            }
+
+            // 清空之前的辨識結果
+            predictionButtonsContainer.innerHTML = '';
+            selectedAnswerPreview.textContent = '辨識中...';
+            submitBtn.disabled = true;
+            submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+            // 確保 handwriting 物件已定義
+            if (typeof handwriting !== 'undefined') {
+                const formattedTrace = convertStrokesToTrace(strokes); // 轉換為 handwriting.js 接受的格式
+
+                const option = {
+                    width: drawingCanvas.width,
+                    height: drawingCanvas.height,
+                    language: "ja", // 設定辨識語言為日文
+                    numOfReturn: 10 // 取得前10個辨識結果
+                };
+
+                handwriting.recognize(formattedTrace, option, function(result) {
+                    selectedAnswerPreview.textContent = '請從下方選擇您的答案:';
+
+                    if (result && result.length > 0) {
+                        result.forEach(prediction => {
+                            const button = document.createElement('button');
+                            button.textContent = prediction;
+                            button.classList.add('prediction-button', 'bg-purple-200', 'text-purple-800', 'px-4', 'py-2', 'rounded-md', 'hover:bg-purple-300', 'transition', 'duration-200', 'ease-in-out', 'shadow', 'text-2xl', 'font-semibold');
+                            button.addEventListener('click', () => {
+                                // 移除所有按鈕的 selected 樣式
+                                document.querySelectorAll('.prediction-button').forEach(btn => {
+                                    btn.classList.remove('selected');
+                                });
+                                // 為當前點擊的按鈕添加 selected 樣式
+                                button.classList.add('selected');
+                                currentSelectedAnswer = prediction; // 設定選擇的答案
+                                selectedAnswerPreview.textContent = `您選擇: ${currentSelectedAnswer}`;
+                                submitBtn.disabled = false; // 啟用送出按鈕
+                                submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                            });
+                            predictionButtonsContainer.appendChild(button);
+                        });
+                    } else {
+                        selectedAnswerPreview.textContent = '無法辨識您的筆跡，請再試一次。';
+                    }
+                }); // handwriting.js 的 recognize 函式不需要最後一個 `false` 參數
+            } else {
+                console.error("handwriting.js 函式庫尚未載入。");
+                selectedAnswerPreview.textContent = '辨識功能暫時無法使用。';
+            }
+        }
+
+
+        /**
+         * 開始遊戲
+         */
+        function startGame() {
+            score = 0;
+            questionCount = 0;
+            quizContainer.classList.remove('hidden');
+            resultScreen.classList.add('hidden');
+            updateScoreAndQuestionCount();
+            nextQuestion();
+        }
+
+        /**
+         * 產生下一題
+         */
+        function nextQuestion() {
+            questionCount++;
+            if (questionCount > maxQuestions) {
+                endGame();
+                return;
+            }
+
+            updateScoreAndQuestionCount();
+            clearCanvas(); // 清空畫布和辨識結果
+
+            // 隨機選擇出題類型：平假名或片假名
+            const isHiraganaQuestion = Math.random() < 0.5;
+            let questionPool, targetMap;
+
+            if (isHiraganaQuestion) {
+                questionPool = allHiragana;
+                targetMap = kanaMap;
+                questionTypeDisplay.textContent = '(請寫出對應的片假名)';
+            } else {
+                questionPool = allKatakana;
+                targetMap = reverseKanaMap;
+                questionTypeDisplay.textContent = '(請寫出對應的平假名)';
+            }
+
+            // 隨機選擇一個字元
+            const randomIndex = Math.floor(Math.random() * questionPool.length);
+            currentQuestionChar = questionPool[randomIndex];
+            currentCorrectAnswer = targetMap[currentQuestionChar]; // 找出正確答案
+
+            questionDisplay.textContent = currentQuestionChar;
+            feedbackDisplay.textContent = ''; // 清空回饋訊息
+            currentSelectedAnswer = ''; // 重置選擇的答案
+        }
+
+        /**
+         * 更新分數和題目進度顯示
+         */
+        function updateScoreAndQuestionCount() {
+            scoreDisplay.textContent = score;
+            questionCountDisplay.textContent = `${questionCount - 1}/10`; // 因為questionCount會先加1才檢查，所以-1
+            if (questionCount > maxQuestions) { // 處理最後一題顯示
+                 questionCountDisplay.textContent = `${maxQuestions}/${maxQuestions}`;
+            }
+        }
+
+        /**
+         * 提交答案並檢查
+         */
+        submitBtn.addEventListener('click', () => {
+            if (!currentSelectedAnswer) {
+                feedbackDisplay.textContent = '請先選擇一個辨識結果！';
+                feedbackDisplay.className = 'text-2xl font-bold mt-2 text-yellow-600';
+                return;
+            }
+
+            if (currentSelectedAnswer === currentCorrectAnswer) {
+                score++;
+                feedbackDisplay.textContent = '✓ 正確！';
+                feedbackDisplay.className = 'text-2xl font-bold mt-2 text-green-600';
+            } else {
+                feedbackDisplay.textContent = `✗ 錯誤！正確答案是: ${currentCorrectAnswer}`;
+                feedbackDisplay.className = 'text-2xl font-bold mt-2 text-red-600';
+            }
+
+            // 禁用送出按鈕防止重複提交
+            submitBtn.disabled = true;
+            submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+
+            // 稍作延遲後進入下一題，讓使用者看到回饋
+            setTimeout(nextQuestion, 1500);
+        });
+
+        /**
+         * 結束遊戲並顯示結果
+         */
+        function endGame() {
+            quizContainer.classList.add('hidden');
+            resultScreen.classList.remove('hidden');
+            finalScoreDisplay.textContent = score;
+        }
+
+        // 再玩一次按鈕事件
+        playAgainBtn.addEventListener('click', startGame);
+
+        // 頁面載入完成後啟動遊戲
+        window.onload = function() {
+            setupCanvas(); // 初始化畫布
+            startGame();
+        };
+    </script>
+</body>
+</html>
